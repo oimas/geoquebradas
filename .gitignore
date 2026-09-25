@@ -1,0 +1,9 @@
+# nunca subir claves ni credenciales
+*.json
+.env
+*.pem
+*.key
+# basura
+__pycache__/
+*.log
+.DS_Store
