@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esqueleto — quebrada_francesa v2</title>
+<style>
+:root{--teal:#00a99d;--blue:#0f5ca8;--navy:#14213d;--line:#c9d1d9;--ph:#eef1f4;--txt:#1d2733;--muted:#66727f;--top:76px;--foot:44px;--side:400px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:Arial,Helvetica,sans-serif;color:var(--txt);font-size:13px;background:#fff}
+.ph{background:var(--ph);border:1.5px dashed #9aa6b2;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;letter-spacing:.3px}
+.tag{position:absolute;background:var(--navy);color:#fff;font-size:10px;padding:2px 6px;border-radius:3px;z-index:50;font-weight:400}
+
+/* pantalla del mapa: cabecera + mapa + pie = 100vh */
+#screen{height:100vh;min-height:620px;position:relative;display:flex;flex-direction:column}
+#top{height:var(--top);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex:none;position:relative}
+#top .menu{height:100%;width:76px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+#top .logo{width:230px;height:46px}
+#top .tabs{display:flex;gap:6px}
+#top .tabs span{padding:8px 14px;border-radius:18px;background:var(--ph);border:1.5px dashed #9aa6b2;font-weight:700;font-size:11.5px;color:var(--navy)}
+#top .tabs span.on{background:var(--navy);color:#fff;border-style:solid;border-color:var(--navy)}
+#top .search{flex:0 1 380px;height:44px;border-radius:24px;margin-left:auto}
+#top .ico{width:44px;height:44px;border-radius:8px}
+#top .teal{width:64px;height:100%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+#body{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#dfe6ec;border:1.5px dashed #9aa6b2;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#9aa6b2;letter-spacing:6px}
+/* chips sobre el mapa */
+#chips{position:absolute;top:12px;left:74px;right:calc(var(--side) + 90px);display:flex;gap:8px;z-index:5;flex-wrap:wrap}
+#chips span{background:#fff;border:1px solid var(--line);border-radius:18px;padding:7px 14px;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+#chips span.f{background:var(--navy);color:#fff}
+#zoom{position:absolute;left:14px;top:12px;display:flex;flex-direction:column;gap:8px;z-index:5}
+#zoom i{width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:20px}
+#zoom i.d{font-size:11px;font-weight:800;border-radius:20px;height:36px}
+/* esquina inferior izquierda */
+#bl{position:absolute;left:14px;bottom:14px;display:flex;gap:12px;align-items:flex-end;z-index:5}
+#bl .mini{width:128px;height:128px;background:#cfd8e0;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);font-size:11px}
+#bl .sc{display:flex;flex-direction:column;gap:6px}
+#bl .sc div{background:rgba(255,255,255,.92);padding:7px 12px;font-size:12px;min-width:200px}
+#timeline{position:absolute;left:400px;bottom:14px;right:calc(var(--side) + 120px);height:40px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 5px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;padding:0 14px;z-index:5;font-size:11.5px}
+#timeline b{flex:1;height:6px;background:linear-gradient(90deg,var(--teal) 55%,#d7dde3 55%);border-radius:3px}
+#br{position:absolute;right:calc(var(--side) + 20px);bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:5}
+#br i{width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:700}
+/* riel */
+#rail{position:absolute;top:14px;right:var(--side);display:flex;flex-direction:column;gap:8px;z-index:6}
+#rail i{width:50px;height:54px;border-radius:12px 0 0 12px;background:var(--blue);color:#fff;font-style:normal;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:-1px 1px 5px rgba(0,0,0,.3)}
+#rail i.w{background:#fff;color:var(--navy)}
+/* panel */
+#side{position:absolute;top:0;right:0;bottom:0;width:var(--side);background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:0;z-index:5}
+.blk{padding:14px 16px;border-bottom:1px solid var(--line);position:relative}
+.blk h4{font-size:12px;letter-spacing:.7px;color:var(--navy);text-transform:uppercase;margin-bottom:8px}
+.b1{height:190px}.b2{height:170px}.b3{flex:1;min-height:0;overflow:hidden}
+.bar{height:12px;border-radius:6px;background:var(--ph);border:1px dashed #9aa6b2;margin-bottom:8px}
+.leg div{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px}
+.leg i{width:14px;height:14px;border-radius:3px;display:inline-block}
+.leg b{margin-left:auto}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp div{height:66px;border-radius:8px;background:var(--ph);border:1px dashed #9aa6b2;padding:8px 10px;font-size:10.5px;color:var(--muted);font-weight:700;position:relative}
+.kp div:before{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--c)}
+.kp .w{grid-column:span 2;height:58px}
+#foot{height:var(--foot);border-top:1px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+/* secciones de abajo */
+.sec{min-height:520px;padding:40px 60px;border-top:6px solid var(--navy);position:relative}
+.sec h2{color:var(--navy);margin-bottom:18px;font-size:18px;text-transform:uppercase;letter-spacing:.6px}
+.grid3{display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:16px}
+.grid3 .ph{height:150px}
+.note{position:fixed;right:10px;bottom:10px;background:#fff8e1;border:1px solid #f1d98a;color:#6b5400;padding:8px 12px;border-radius:8px;font-size:12px;z-index:99;max-width:300px}
+</style>
+</head>
+<body>
+<div class="note"><b>ESQUELETO VACÍO</b> — solo distribución. Sin datos ni funciones. Baje con la rueda para ver las secciones 2 y 3.</div>
+
+<div id="screen">
+  <header id="top">
+    <div class="menu">MENÚ</div>
+    <div class="logo ph">MINAM · geoquebradas</div>
+    <div class="tabs"><span class="on">Situación</span><span>Detalle</span><span>Acerca de</span></div>
+    <div class="search ph">Buscar departamento, provincia, distrito   +</div>
+    <div class="ico ph">?</div><div class="ico ph">Imp</div>
+    <div class="teal">Favoritos</div><div class="teal" style="border-left:1px solid rgba(255,255,255,.4)">Compartir</div>
+  </header>
+
+  <div id="body">
+    <div id="map">M A P A</div>
+    <span class="tag" style="left:400px;top:70px">Mapa a pantalla completa (todo el alto entre cabecera y pie)</span>
+
+    <div id="zoom"><i>+</i><i>&minus;</i><i class="d">2D | 3D</i></div>
+    <div id="chips"><span class="f">Filtros 1</span><span>Fecha 22/09/2026</span><span>Departamento</span><span>Limpiar</span></div>
+    <span class="tag" style="left:330px;top:52px">Chips sobre el mapa (sin niveles: los niveles van en la leyenda)</span>
+
+    <div id="bl"><div class="mini ph">minimapa</div><div class="sc"><div>Escala 1 : —</div><div>&#9472;&#9472;&#9472; 50 km</div></div></div>
+    <div id="timeline">Línea de tiempo &nbsp; &#9664; <b></b> &#9654; <span>22/09</span></div>
+    <div id="br"><i>Loc</i><i>Full</i></div>
+
+    <div id="rail"><i>&rsaquo;</i><i class="w">Capas<br>2</i><i>Herr.</i><i>Leyen.</i></div>
+
+    <aside id="side">
+      <div class="blk b1">
+        <span class="tag" style="left:8px;top:-8px">BLOQUE 1</span>
+        <h4>Quebradas con aviso: prioridad territorial</h4>
+        <div class="bar" style="width:90%"></div><div class="bar" style="width:70%"></div>
+        <div style="margin:10px 0;font-size:12px"><b>Fecha del dato:</b> 22/09/2026 &nbsp; <b>Ámbito:</b> Perú</div>
+        <div class="ph" style="height:34px;border-radius:18px;background:var(--teal);color:#fff;border:0">Ver detalle</div>
+      </div>
+      <div class="blk b2">
+        <span class="tag" style="left:8px;top:-8px">BLOQUE 2 · LEYENDA (clic = filtra · se oculta solo si el usuario quiere)</span>
+        <h4>Leyenda <span style="float:right;font-weight:400;color:var(--muted)">[ ocultar ]</span></h4>
+        <div class="leg">
+          <div><i style="background:#c1121f"></i>Muy Alto<b>2</b></div>
+          <div><i style="background:#f97316"></i>Alto<b>38</b></div>
+          <div><i style="background:#ffd400"></i>Medio<b>11</b></div>
+          <div><i style="background:#2fbf71"></i>Bajo<b>17</b></div>
+        </div>
+      </div>
+      <div class="blk b3" style="border-bottom:0">
+        <span class="tag" style="left:8px;top:-8px">BLOQUE 3 · INDICADORES (cambia con la selección)</span>
+        <h4>Indicadores</h4>
+        <div class="kp">
+          <div class="w" style="--c:#00e5ff">Quebradas con aviso</div>
+          <div style="--c:#ff7a1a">Población expuesta</div><div style="--c:#e03535">Viviendas expuestas</div>
+          <div style="--c:#3d8ef8">Red vial expuesta</div><div style="--c:#f5b800">Superficie agrícola</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+  <footer id="foot">Datos cartográficos: MINAM, SENAMHI &nbsp; +</footer>
+</div>
+
+<section class="sec">
+  <h2>Sección 2 · Detalle por quebrada (ancho completo)</h2>
+  <div class="grid3">
+    <div class="ph">Resumen: nivel, IPT-AQ, medidor</div><div class="ph">Gráfico de evolución (grande)</div><div class="ph">Orientaciones</div>
+    <div class="ph">Amenaza · Exposición · Agravamiento</div><div class="ph">Elementos expuestos</div><div class="ph">Semáforo 7 días · persistencia</div>
+  </div>
+  <h2 style="margin-top:30px">Ranking y tabla</h2>
+  <div class="grid3" style="grid-template-columns:1fr 2fr"><div class="ph">Ranking de departamentos</div><div class="ph">Tabla de quebradas (ordenable, paginada)</div></div>
+</section>
+<section class="sec">
+  <h2>Sección 3 · Acerca de GeoQuebradas</h2>
+  <div class="grid3"><div class="ph">Qué es · rol de SENAMHI y MINAM</div><div class="ph">Metodología IPT-AQ · fórmula · tabla de niveles</div><div class="ph">Recursos · fuentes</div></div>
+</section>
+</body>
+</html>

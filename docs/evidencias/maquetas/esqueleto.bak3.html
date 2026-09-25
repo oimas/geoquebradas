@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esqueleto — quebrada_francesa v2</title>
+<style>
+:root{--teal:#00a99d;--blue:#0f5ca8;--navy:#14213d;--line:#c9d1d9;--ph:#eef1f4;--txt:#1d2733;--muted:#66727f;--top:76px;--foot:44px;--side:400px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:Arial,Helvetica,sans-serif;color:var(--txt);font-size:13px;background:#fff}
+.ph{background:var(--ph);border:1.5px dashed #9aa6b2;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;letter-spacing:.3px}
+.tag{position:absolute;background:var(--navy);color:#fff;font-size:10px;padding:2px 6px;border-radius:3px;z-index:50;font-weight:400}
+
+/* pantalla del mapa: cabecera + mapa + pie = 100vh */
+#screen{height:100vh;min-height:620px;position:relative;display:flex;flex-direction:column}
+#top{height:var(--top);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex:none;position:relative}
+#top .menu{height:100%;width:76px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+#top .logo{width:230px;height:46px}
+#top .tabs{display:flex;gap:6px}
+#top .tabs span{padding:8px 14px;border-radius:18px;background:var(--ph);border:1.5px dashed #9aa6b2;font-weight:700;font-size:11.5px;color:var(--navy)}
+#top .tabs span.on{background:var(--navy);color:#fff;border-style:solid;border-color:var(--navy)}
+#top .search{flex:0 1 380px;height:44px;border-radius:24px;margin-left:auto}
+#top .ico{width:44px;height:44px;border-radius:8px}
+#top .teal{width:64px;height:100%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+#body{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#dfe6ec;border:1.5px dashed #9aa6b2;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#9aa6b2;letter-spacing:6px}
+/* chips sobre el mapa */
+#chips{position:absolute;top:12px;left:74px;right:calc(var(--side) + 90px);display:flex;gap:8px;z-index:5;flex-wrap:wrap}
+#chips span{background:#fff;border:1px solid var(--line);border-radius:18px;padding:7px 14px;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+#chips span.f{background:var(--navy);color:#fff}
+#zoom{position:absolute;left:14px;top:12px;display:flex;flex-direction:column;gap:8px;z-index:5}
+#zoom i{width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:20px}
+#zoom i.d{font-size:11px;font-weight:800;border-radius:20px;height:36px}
+/* esquina inferior izquierda */
+#bl{position:absolute;left:14px;bottom:14px;display:flex;gap:12px;align-items:flex-end;z-index:5}
+#bl .mini{width:128px;height:128px;background:#cfd8e0;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);font-size:11px}
+#bl .sc{display:flex;flex-direction:column;gap:6px}
+#bl .sc div{background:rgba(255,255,255,.92);padding:7px 12px;font-size:12px;min-width:200px}
+#timeline{position:absolute;left:400px;bottom:14px;right:calc(var(--side) + 120px);height:40px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 5px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;padding:0 14px;z-index:5;font-size:11.5px}
+#timeline b{flex:1;height:6px;background:linear-gradient(90deg,var(--teal) 55%,#d7dde3 55%);border-radius:3px}
+#br{position:absolute;right:calc(var(--side) + 20px);bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:5}
+#br i{width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:700}
+/* riel */
+#rail{position:absolute;top:14px;right:var(--side);display:flex;flex-direction:column;gap:8px;z-index:6}
+#rail i{width:50px;height:54px;border-radius:12px 0 0 12px;background:var(--blue);color:#fff;font-style:normal;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:-1px 1px 5px rgba(0,0,0,.3)}
+#rail i.w{background:#fff;color:var(--navy)}
+/* panel */
+#side{position:absolute;top:0;right:0;bottom:0;width:var(--side);background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:0;z-index:5}
+.blk{padding:14px 16px;border-bottom:1px solid var(--line);position:relative}
+.blk h4{font-size:12px;letter-spacing:.7px;color:var(--navy);text-transform:uppercase;margin-bottom:8px}
+.b1{height:190px}.b2{height:300px}.b3{flex:1;min-height:0;overflow:visible}
+.bar{height:12px;border-radius:6px;background:var(--ph);border:1px dashed #9aa6b2;margin-bottom:8px}
+.leg div{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px}
+.leg i{width:14px;height:14px;border-radius:3px;display:inline-block}
+.leg b{margin-left:auto}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp div{height:66px;border-radius:8px;background:var(--ph);border:1px dashed #9aa6b2;padding:8px 10px;font-size:10.5px;color:var(--muted);font-weight:700;position:relative}
+.kp div:before{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--c)}
+.kp .w{grid-column:span 2;height:58px}
+#foot{height:var(--foot);border-top:1px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+/* secciones de abajo */
+.sec{min-height:520px;padding:40px 60px;border-top:6px solid var(--navy);position:relative}
+.sec h2{color:var(--navy);margin-bottom:18px;font-size:18px;text-transform:uppercase;letter-spacing:.6px}
+.grid3{display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:16px}
+.grid3 .ph{height:150px}
+.note{position:fixed;right:10px;bottom:10px;background:#fff8e1;border:1px solid #f1d98a;color:#6b5400;padding:8px 12px;border-radius:8px;font-size:12px;z-index:99;max-width:300px}
+/* buscador de capas */
+#tools{display:flex;gap:8px;padding:12px 14px;background:var(--bg);border-bottom:1px solid var(--line)}
+#q{flex:1;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:0}
+#q:focus{border-color:var(--teal)}
+.tb{height:38px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tb.on{background:var(--teal)}
+.tb .n{background:#fff;color:var(--navy);border-radius:10px;font-size:11px;padding:1px 7px}
+#list{flex:1;overflow-y:auto;padding:12px 14px 24px}
+/* categoría */
+.cat{margin-bottom:8px;border-radius:8px;overflow:hidden;border:1px solid var(--blue)}
+.cat>.h{display:flex;align-items:center;gap:10px;background:var(--blue);color:#fff;padding:12px 14px;cursor:pointer}
+.cat>.h:hover{background:var(--blue-d)}
+.cat .t{flex:1}.cat .t b{display:block;font-size:15px}
+.cat .t small{display:block;font-size:11.5px;opacity:.92;margin-top:2px;line-height:1.3}
+.cat .bd{background:var(--teal);color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:2px 8px}
+.cat .car{font-size:14px;transition:transform .2s}
+.cat.open .car{transform:rotate(90deg)}
+.cat .kb{font-size:18px;padding:0 6px;color:#fff;font-weight:700}
+.cat .body{display:none;background:#fff}
+.cat.open .body{display:block}
+.sg{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:10px 14px 4px;background:var(--bg)}
+.ly{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line);position:relative}
+.ly .sym{width:24px;flex:none;display:flex;align-items:center;justify-content:center}
+.ly .nm{flex:1;font-size:13px;line-height:1.25}
+.ly .nm small{display:block;color:#b45f06;font-size:10.5px}
+.ly .kb{color:var(--muted);font-size:18px;padding:0 4px}
+.sw{width:38px;height:22px;border-radius:12px;background:#c5ccd4;position:relative;flex:none;transition:.2s}
+.sw:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--teal)}.sw.on:after{left:19px}
+/* símbolos */
+.s-dot{width:11px;height:11px;border-radius:50%;background:#111}
+.s-ring{width:13px;height:13px;border-radius:50%;border:2px solid #111}
+.s-sq{width:12px;height:12px}
+.s-dia{width:11px;height:11px;transform:rotate(45deg)}
+.s-tri{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid}
+.s-ln{width:22px;height:0;border-top:3px solid}
+.s-pl{width:20px;height:14px;border:2px solid;background:transparent}
+.ramp{display:flex;flex-direction:column;gap:5px;padding:4px 14px 12px 50px}
+.ramp div{display:flex;align-items:center;gap:8px;font-size:12px}.ramp i{width:22px;height:12px;display:inline-block;border-radius:2px}
+/* menú ⋮ */
+.pop{display:none;position:absolute;right:10px;top:38px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.2);width:230px;padding:10px;z-index:9}
+.pop.on{display:block}
+.pop div{padding:7px 4px;font-size:12.5px;border-bottom:1px solid var(--line)}
+.pop div:last-child{border:0}
+.pop input{width:100%;accent-color:var(--teal)}
+.empty{padding:26px 8px;text-align:center;color:var(--muted)}
+#rail i{cursor:pointer}#rail i.act{background:var(--navy)}#rail i.w.act{color:#fff}
+#v-capas{display:none;flex-direction:column;flex:1;min-height:0}
+#side.capas #v-capas{display:flex}
+#side.capas>.blk{display:none}
+#v-capas .vh{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid #c9d1d9;min-height:74px}
+#v-capas .vh b{color:var(--teal);font-size:24px;width:22px;cursor:pointer}
+#v-capas .vh span{font-weight:800;font-size:16px;letter-spacing:.2px;color:var(--navy);text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="note" onclick="this.remove()" title="Clic para cerrar" style="cursor:pointer"><b>ESQUELETO VACÍO</b> — solo distribución. Sin datos ni funciones. Baje con la rueda para ver las secciones 2 y 3. Pulse el botón <b>Capas</b> del borde del panel para ver el nuevo formato de capas.</div>
+
+<div id="screen">
+  <header id="top">
+    <div class="menu">MENÚ</div>
+    <div class="logo ph">MINAM · geoquebradas</div>
+    <div class="tabs"><span class="on">Situación</span><span>Detalle</span><span>Acerca de</span></div>
+    <div class="search ph">Buscar departamento, provincia, distrito   +</div>
+    <div class="ico ph">?</div><div class="ico ph">Imp</div>
+    <div class="teal">Favoritos</div><div class="teal" style="border-left:1px solid rgba(255,255,255,.4)">Compartir</div>
+  </header>
+
+  <div id="body">
+    <div id="map">M A P A</div>
+    <span class="tag" style="left:400px;top:70px">Mapa a pantalla completa (todo el alto entre cabecera y pie)</span>
+
+    <div id="zoom"><i>+</i><i>&minus;</i><i class="d">2D | 3D</i></div>
+    <div id="chips"><span class="f">Filtros 1</span><span>Fecha 22/09/2026</span><span>Departamento</span><span>Limpiar</span></div>
+    <span class="tag" style="left:330px;top:52px">Chips sobre el mapa (sin niveles: los niveles van en la leyenda)</span>
+
+    <div id="bl"><div class="mini ph">minimapa</div><div class="sc"><div>Escala 1 : —</div><div>&#9472;&#9472;&#9472; 50 km</div></div></div>
+    <div id="timeline">Línea de tiempo &nbsp; &#9664; <b></b> &#9654; <span>22/09</span></div>
+    <div id="br"><i>Loc</i><i>Full</i></div>
+
+    <div id="rail"><i>&rsaquo;</i><i class="w" id="rb-capas" title="Capas de información"><div style="text-align:center">Capas<br><span id="rail-n">0</span></div></i><i>Herr.</i><i>Leyen.</i></div>
+
+    <aside id="side">
+      <div class="blk b1">
+        <span class="tag" style="left:8px;top:-8px">BLOQUE 1</span>
+        <h4>Quebradas con aviso: prioridad territorial</h4>
+        <div class="bar" style="width:90%"></div><div class="bar" style="width:70%"></div>
+        <div style="margin:10px 0;font-size:12px"><b>Fecha del dato:</b> 22/09/2026 &nbsp; <b>Ámbito:</b> Perú</div>
+        <div class="ph" style="height:34px;border-radius:18px;background:var(--teal);color:#fff;border:0">Ver detalle</div>
+      </div>
+      <div class="blk b2">
+        <span class="tag" style="left:8px;top:-8px">BLOQUE 2 · INDICADORES (cambia con la selección)</span>
+        <h4>Indicadores</h4>
+        <div class="kp">
+          <div class="w" style="--c:#00e5ff">Quebradas con aviso</div>
+          <div style="--c:#ff7a1a">Población expuesta</div><div style="--c:#e03535">Viviendas expuestas</div>
+          <div style="--c:#3d8ef8">Red vial expuesta</div><div style="--c:#f5b800">Superficie agrícola</div>
+        </div>
+      </div>
+      <div class="blk b3" style="border-bottom:0">
+        <span class="tag" style="left:8px;top:-8px">BLOQUE 3 · LEYENDA (clic = filtra · se oculta solo si el usuario quiere)</span>
+        <h4>Leyenda <span style="float:right;font-weight:400;color:var(--muted)">[ ocultar ]</span></h4>
+        <div class="leg">
+          <div><i style="background:#c1121f"></i>Muy Alto<b>2</b></div>
+          <div><i style="background:#f97316"></i>Alto<b>38</b></div>
+          <div><i style="background:#ffd400"></i>Medio<b>11</b></div>
+          <div><i style="background:#2fbf71"></i>Bajo<b>17</b></div>
+        </div>
+        <div class="ph" style="height:64px;margin-top:10px;font-size:11px;font-weight:400">Leyenda de las capas encendidas (aparece aquí solo mientras estén activas)</div>
+      </div>
+    <div id="v-capas">
+      <div class="vh"><b id="cap-back" title="Volver">&lsaquo;</b><span>Capas de información</span></div>
+      <div id="tools"><input id="q" placeholder="Buscar capa…"><button class="tb" id="b-act">Solo activas <span class="n" id="n-act">0</span></button></div>
+      <div id="list"></div>
+    </div>
+    </aside>
+  </div>
+  <footer id="foot">Datos cartográficos: MINAM, SENAMHI &nbsp; +</footer>
+</div>
+
+<section class="sec">
+  <h2>Sección 2 · Detalle por quebrada (ancho completo)</h2>
+  <div class="grid3">
+    <div class="ph">Resumen: nivel, IPT-AQ, medidor</div><div class="ph">Gráfico de evolución (grande)</div><div class="ph">Orientaciones</div>
+    <div class="ph">Amenaza · Exposición · Agravamiento</div><div class="ph">Elementos expuestos</div><div class="ph">Semáforo 7 días · persistencia</div>
+  </div>
+  <h2 style="margin-top:30px">Ranking y tabla</h2>
+  <div class="grid3" style="grid-template-columns:1fr 2fr"><div class="ph">Ranking de departamentos</div><div class="ph">Tabla de quebradas (ordenable, paginada)</div></div>
+</section>
+<section class="sec">
+  <h2>Sección 3 · Acerca de GeoQuebradas</h2>
+  <div class="grid3"><div class="ph">Qué es · rol de SENAMHI y MINAM</div><div class="ph">Metodología IPT-AQ · fórmula · tabla de niveles</div><div class="ph">Recursos · fuentes</div></div>
+</section>
+<script>
+(function(){
+
+const sym=(k,c)=>({dot:`<i class="s-dot" style="background:${c||'#111'}"></i>`,ring:`<i class="s-ring"></i>`,sq:`<i class="s-sq" style="background:${c}"></i>`,dia:`<i class="s-dia" style="background:${c}"></i>`,
+  tri:`<i class="s-tri" style="border-bottom-color:${c}"></i>`,ln:`<i class="s-ln" style="border-color:${c}"></i>`,pl:`<i class="s-pl" style="border-color:${c}"></i>`}[k]);
+const CATS=[
+ {n:'Información de referencia',d:'Límites político-administrativos y capitales',g:[{s:null,l:[
+   ['Límites — Distrito',sym('pl','#8a94a0')],['Límites — Provincia',sym('pl','#5b6672')],['Límites — Departamento',sym('pl','#2b3440')],['Capitales',sym('ring')]]}]},
+ {n:'Zona efectiva de análisis',d:'Índice Topográfico de Humedad que define la zona de cada quebrada',g:[{s:null,l:[
+   ['Índice Topográfico de Humedad (TWI)',sym('sq','#2b6cb0'),null,[['Muy alto','#08306b'],['Alto','#2171b5'],['Medio','#6baed6'],['Bajo','#c6dbef']]]]}]},
+ {n:'Exposición directa',d:'Población, infraestructura crítica, red vial y áreas productivas',open:1,g:[
+   {s:'Exposición poblacional',l:[['Centros poblados',sym('dot'),1]]},
+   {s:'Infraestructura crítica y servicios',l:[['Establecimientos de salud',sym('sq','#d64545'),1],['Instituciones educativas',sym('sq','#3d7be0')],['Agencias bancarias',sym('dia','#2e9e5b')]]},
+   {s:'Vial, hídrica y productiva',l:[['Red vial',sym('ln','#f28c28')],['Áreas agrícolas',sym('sq','#9ccf7a'),0,null,'Capa pesada: acercar el mapa'],['Canales de regadío',sym('ln','#3aa0d8'),0,null,'Capa pesada: acercar el mapa']]}]},
+ {n:'Agravamiento ambiental-sanitario',d:'Fuentes potenciales de contaminación y cuerpos de agua ECA',g:[
+   {s:'Fuentes de contaminación y residuos',l:[['Pasivos ambientales mineros',sym('tri','#7b3fa0')],['Pasivos de hidrocarburos',sym('tri','#5a3a22')],['Infraestructura de residuos sólidos',sym('sq','#8b5a2b')],['Áreas degradadas RRSS municipales',sym('sq','#e8a0c8')],['Áreas degradadas RRSS no municipales',sym('sq','#f0b27a')]]},
+   {s:'Cuerpos lóticos — ECA Agua',l:[['Categoría 1A2',sym('ln','#22c1dc')],['Categoría 3',sym('ln','#e0a800')],['Categoría 4',sym('ln','#f97316')]]}]}
+];
+const on=new Set(); let idn=0;
+CATS.forEach(c=>c.g.forEach(g=>g.l.forEach(l=>{l.id=idn++;if(l[2])on.add(l.id)})));
+let onlyAct=false,q='';
+const list=document.getElementById('list');
+function render(){
+  const qq=q.trim().toLowerCase(); let html='',total=0;
+  CATS.forEach((c,ci)=>{
+    let body='',cnt=0,shown=0;
+    c.g.forEach(g=>{
+      const items=g.l.filter(l=>(!qq||l[0].toLowerCase().includes(qq))&&(!onlyAct||on.has(l.id)));
+      g.l.forEach(l=>{if(on.has(l.id))cnt++});
+      if(!items.length)return; shown+=items.length;
+      if(g.s) body+=`<div class="sg">${g.s}</div>`;
+      items.forEach(l=>{
+        body+=`<div class="ly"><span class="sym">${l[1]}</span><span class="nm">${l[0]}${l[4]?`<small>${l[4]}</small>`:''}</span>
+          <button class="sw ${on.has(l.id)?'on':''}" data-id="${l.id}" title="Encender o apagar"></button><button class="kb" data-k="${l.id}">&#8942;</button>
+          <div class="pop" id="m${l.id}"><div>Opacidad<input type="range" min="10" max="100" value="100"></div><div>Acercar a la capa</div><div>Información de la fuente</div></div></div>`;
+        if(l[3]) body+=`<div class="ramp">${l[3].map(r=>`<div><i style="background:${r[1]}"></i>${r[0]}</div>`).join('')}</div>`;
+      });
+    });
+    if((qq||onlyAct)&&!shown)return; total+=shown;
+    const open=(qq||onlyAct)?true:c.open;
+    html+=`<div class="cat ${open?'open':''}" data-c="${ci}"><div class="h"><span class="t"><b>${c.n}</b><small>${c.d}</small></span>${cnt?`<span class="bd">${cnt}</span>`:''}<span class="car">&rsaquo;</span></div><div class="body">${body}</div></div>`;
+  });
+  list.innerHTML=html||'<div class="empty">Ninguna capa coincide.</div>';
+  document.getElementById('n-act').textContent=on.size;document.getElementById('rail-n').textContent=on.size;
+  document.getElementById('b-act').classList.toggle('on',onlyAct);
+}
+list.addEventListener('click',e=>{
+  const sw=e.target.closest('.sw'); if(sw){const i=+sw.dataset.id;on.has(i)?on.delete(i):on.add(i);const sc=list.scrollTop;render();list.scrollTop=sc;return}
+  const kb=e.target.closest('.kb[data-k]'); if(kb){const m=document.getElementById('m'+kb.dataset.k);const was=m.classList.contains('on');document.querySelectorAll('.pop').forEach(x=>x.classList.remove('on'));if(!was)m.classList.add('on');return}
+  if(e.target.closest('.pop'))return;
+  const h=e.target.closest('.cat>.h'); if(h){const c=CATS[+h.parentNode.dataset.c];c.open=!h.parentNode.classList.contains('open');h.parentNode.classList.toggle('open',c.open)}
+});
+document.getElementById('q').oninput=e=>{q=e.target.value;render()};
+document.getElementById('b-act').onclick=()=>{onlyAct=!onlyAct;render()};
+render();
+
+const side=document.getElementById('side'),rb=document.getElementById('rb-capas');
+function capas(v){side.classList.toggle('capas',v);rb.classList.toggle('act',v)}
+rb.onclick=()=>capas(!side.classList.contains('capas'));
+document.getElementById('cap-back').onclick=()=>capas(false);
+if(location.hash==='#capas')capas(true);
+
+})();
+</script>
+</body>
+</html>

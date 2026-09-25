@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta — panel de capas</title>
+<style>
+:root{--teal:#00a99d;--teal-d:#008a80;--blue:#0f5ca8;--blue-d:#0b4b8c;--navy:#14213d;--line:#dde2e8;--bg:#f4f6f8;--txt:#1d2733;--muted:#66727f;--top:76px;--foot:44px;--side:400px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:var(--txt);font-size:13px;background:#fff}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.ph{background:#eef1f4;border:1.5px dashed #9aa6b2;color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:700}
+#top{height:var(--top);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;position:relative}
+#top .menu{height:100%;width:76px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+#top .logo{width:230px;height:46px}
+#top .search{flex:0 1 380px;height:44px;border-radius:24px;margin-left:auto}
+#top .teal{width:64px;height:100%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+#body{position:absolute;top:var(--top);bottom:var(--foot);left:0;right:0}
+#foot{position:absolute;bottom:0;left:0;right:0;height:var(--foot);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+#map{position:absolute;inset:0;background:#dfe6ec;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#a9b4bf;letter-spacing:6px}
+#rail{position:absolute;top:14px;right:var(--side);display:flex;flex-direction:column;gap:8px;z-index:6}
+#rail i{width:50px;height:54px;border-radius:12px 0 0 12px;background:var(--blue);color:#fff;font-style:normal;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:-1px 1px 5px rgba(0,0,0,.3)}
+#rail i.on{background:var(--navy)}
+#side{position:absolute;top:0;right:0;bottom:0;width:var(--side);background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;z-index:5;box-shadow:-2px 0 8px rgba(0,0,0,.08)}
+#side-h{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid #c9d1d9;min-height:74px}
+#side-h b{color:var(--teal);font-size:24px;width:22px}
+#side-h span{font-weight:800;font-size:16px;letter-spacing:.2px;color:var(--navy);text-transform:uppercase}
+/* buscador de capas */
+#tools{display:flex;gap:8px;padding:12px 14px;background:var(--bg);border-bottom:1px solid var(--line)}
+#q{flex:1;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:0}
+#q:focus{border-color:var(--teal)}
+.tb{height:38px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tb.on{background:var(--teal)}
+.tb .n{background:#fff;color:var(--navy);border-radius:10px;font-size:11px;padding:1px 7px}
+#list{flex:1;overflow-y:auto;padding:12px 14px 24px}
+/* categoría */
+.cat{margin-bottom:8px;border-radius:8px;overflow:hidden;border:1px solid var(--blue)}
+.cat>.h{display:flex;align-items:center;gap:10px;background:var(--blue);color:#fff;padding:12px 14px;cursor:pointer}
+.cat>.h:hover{background:var(--blue-d)}
+.cat .t{flex:1}.cat .t b{display:block;font-size:15px}
+.cat .t small{display:block;font-size:11.5px;opacity:.92;margin-top:2px;line-height:1.3}
+.cat .bd{background:var(--teal);color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:2px 8px}
+.cat .car{font-size:14px;transition:transform .2s}
+.cat.open .car{transform:rotate(90deg)}
+.cat .kb{font-size:18px;padding:0 6px;color:#fff;font-weight:700}
+.cat .body{display:none;background:#fff}
+.cat.open .body{display:block}
+.sg{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:10px 14px 4px;background:var(--bg)}
+.ly{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line);position:relative}
+.ly .sym{width:24px;flex:none;display:flex;align-items:center;justify-content:center}
+.ly .nm{flex:1;font-size:13px;line-height:1.25}
+.ly .nm small{display:block;color:#b45f06;font-size:10.5px}
+.ly .kb{color:var(--muted);font-size:18px;padding:0 4px}
+.sw{width:38px;height:22px;border-radius:12px;background:#c5ccd4;position:relative;flex:none;transition:.2s}
+.sw:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--teal)}.sw.on:after{left:19px}
+/* símbolos */
+.s-dot{width:11px;height:11px;border-radius:50%;background:#111}
+.s-ring{width:13px;height:13px;border-radius:50%;border:2px solid #111}
+.s-sq{width:12px;height:12px}
+.s-dia{width:11px;height:11px;transform:rotate(45deg)}
+.s-tri{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid}
+.s-ln{width:22px;height:0;border-top:3px solid}
+.s-pl{width:20px;height:14px;border:2px solid;background:transparent}
+.ramp{display:flex;flex-direction:column;gap:5px;padding:4px 14px 12px 50px}
+.ramp div{display:flex;align-items:center;gap:8px;font-size:12px}.ramp i{width:22px;height:12px;display:inline-block;border-radius:2px}
+/* menú ⋮ */
+.pop{display:none;position:absolute;right:10px;top:38px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.2);width:230px;padding:10px;z-index:9}
+.pop.on{display:block}
+.pop div{padding:7px 4px;font-size:12.5px;border-bottom:1px solid var(--line)}
+.pop div:last-child{border:0}
+.pop input{width:100%;accent-color:var(--teal)}
+.empty{padding:26px 8px;text-align:center;color:var(--muted)}
+.note{position:fixed;left:12px;bottom:56px;background:#fff8e1;border:1px solid #f1d98a;color:#6b5400;padding:8px 12px;border-radius:8px;font-size:12px;max-width:340px;z-index:99}
+</style>
+</head>
+<body>
+<div class="note"><b>MAQUETA</b> del panel de Capas. Pruebe: abrir categorías, encender interruptores, buscar una capa, filtrar "Activas" y el menú de tres puntos. No dibuja capas reales todavía.</div>
+
+<header id="top">
+  <div class="menu" style="display:flex">MENÚ</div><div class="logo ph">MINAM · geoquebradas</div>
+  <div class="search ph">Buscar departamento, provincia, distrito   +</div>
+  <div class="teal">Favoritos</div><div class="teal" style="border-left:1px solid rgba(255,255,255,.4)">Compartir</div>
+</header>
+
+<div id="body">
+  <div id="map">M A P A</div>
+  <div id="rail"><i>&rsaquo;</i><i class="on">Capas</i><i>Herr.</i><i>Leyen.</i></div>
+  <aside id="side">
+    <div id="side-h"><b>&lsaquo;</b><span>Capas de información</span></div>
+    <div id="tools">
+      <input id="q" placeholder="Buscar capa…">
+      <button class="tb" id="b-act">Solo activas <span class="n" id="n-act">0</span></button>
+    </div>
+    <div id="list"></div>
+  </aside>
+</div>
+<footer id="foot">Datos cartográficos: MINAM, SENAMHI</footer>
+
+<script>
+const sym=(k,c)=>({dot:`<i class="s-dot" style="background:${c||'#111'}"></i>`,ring:`<i class="s-ring"></i>`,sq:`<i class="s-sq" style="background:${c}"></i>`,dia:`<i class="s-dia" style="background:${c}"></i>`,
+  tri:`<i class="s-tri" style="border-bottom-color:${c}"></i>`,ln:`<i class="s-ln" style="border-color:${c}"></i>`,pl:`<i class="s-pl" style="border-color:${c}"></i>`}[k]);
+const CATS=[
+ {n:'Información de referencia',d:'Límites político-administrativos y capitales',g:[{s:null,l:[
+   ['Límites — Distrito',sym('pl','#8a94a0')],['Límites — Provincia',sym('pl','#5b6672')],['Límites — Departamento',sym('pl','#2b3440')],['Capitales',sym('ring')]]}]},
+ {n:'Zona efectiva de análisis',d:'Índice Topográfico de Humedad que define la zona de cada quebrada',g:[{s:null,l:[
+   ['Índice Topográfico de Humedad (TWI)',sym('sq','#2b6cb0'),null,[['Muy alto','#08306b'],['Alto','#2171b5'],['Medio','#6baed6'],['Bajo','#c6dbef']]]]}]},
+ {n:'Exposición directa',d:'Población, infraestructura crítica, red vial y áreas productivas',open:1,g:[
+   {s:'Exposición poblacional',l:[['Centros poblados',sym('dot'),1]]},
+   {s:'Infraestructura crítica y servicios',l:[['Establecimientos de salud',sym('sq','#d64545'),1],['Instituciones educativas',sym('sq','#3d7be0')],['Agencias bancarias',sym('dia','#2e9e5b')]]},
+   {s:'Vial, hídrica y productiva',l:[['Red vial',sym('ln','#f28c28')],['Áreas agrícolas',sym('sq','#9ccf7a'),0,null,'Capa pesada: acercar el mapa'],['Canales de regadío',sym('ln','#3aa0d8'),0,null,'Capa pesada: acercar el mapa']]}]},
+ {n:'Agravamiento ambiental-sanitario',d:'Fuentes potenciales de contaminación y cuerpos de agua ECA',g:[
+   {s:'Fuentes de contaminación y residuos',l:[['Pasivos ambientales mineros',sym('tri','#7b3fa0')],['Pasivos de hidrocarburos',sym('tri','#5a3a22')],['Infraestructura de residuos sólidos',sym('sq','#8b5a2b')],['Áreas degradadas RRSS municipales',sym('sq','#e8a0c8')],['Áreas degradadas RRSS no municipales',sym('sq','#f0b27a')]]},
+   {s:'Cuerpos lóticos — ECA Agua',l:[['Categoría 1A2',sym('ln','#22c1dc')],['Categoría 3',sym('ln','#e0a800')],['Categoría 4',sym('ln','#f97316')]]}]}
+];
+const on=new Set(); let idn=0;
+CATS.forEach(c=>c.g.forEach(g=>g.l.forEach(l=>{l.id=idn++;if(l[2])on.add(l.id)})));
+let onlyAct=false,q='';
+const list=document.getElementById('list');
+function render(){
+  const qq=q.trim().toLowerCase(); let html='',total=0;
+  CATS.forEach((c,ci)=>{
+    let body='',cnt=0,shown=0;
+    c.g.forEach(g=>{
+      const items=g.l.filter(l=>(!qq||l[0].toLowerCase().includes(qq))&&(!onlyAct||on.has(l.id)));
+      g.l.forEach(l=>{if(on.has(l.id))cnt++});
+      if(!items.length)return; shown+=items.length;
+      if(g.s) body+=`<div class="sg">${g.s}</div>`;
+      items.forEach(l=>{
+        body+=`<div class="ly"><span class="sym">${l[1]}</span><span class="nm">${l[0]}${l[4]?`<small>${l[4]}</small>`:''}</span>
+          <button class="sw ${on.has(l.id)?'on':''}" data-id="${l.id}" title="Encender o apagar"></button><button class="kb" data-k="${l.id}">&#8942;</button>
+          <div class="pop" id="m${l.id}"><div>Opacidad<input type="range" min="10" max="100" value="100"></div><div>Acercar a la capa</div><div>Información de la fuente</div></div></div>`;
+        if(l[3]) body+=`<div class="ramp">${l[3].map(r=>`<div><i style="background:${r[1]}"></i>${r[0]}</div>`).join('')}</div>`;
+      });
+    });
+    if((qq||onlyAct)&&!shown)return; total+=shown;
+    const open=(qq||onlyAct)?true:c.open;
+    html+=`<div class="cat ${open?'open':''}" data-c="${ci}"><div class="h"><span class="t"><b>${c.n}</b><small>${c.d}</small></span>${cnt?`<span class="bd">${cnt}</span>`:''}<span class="car">&rsaquo;</span></div><div class="body">${body}</div></div>`;
+  });
+  list.innerHTML=html||'<div class="empty">Ninguna capa coincide.</div>';
+  document.getElementById('n-act').textContent=on.size;
+  document.getElementById('b-act').classList.toggle('on',onlyAct);
+}
+list.addEventListener('click',e=>{
+  const sw=e.target.closest('.sw'); if(sw){const i=+sw.dataset.id;on.has(i)?on.delete(i):on.add(i);const sc=list.scrollTop;render();list.scrollTop=sc;return}
+  const kb=e.target.closest('.kb[data-k]'); if(kb){const m=document.getElementById('m'+kb.dataset.k);const was=m.classList.contains('on');document.querySelectorAll('.pop').forEach(x=>x.classList.remove('on'));if(!was)m.classList.add('on');return}
+  if(e.target.closest('.pop'))return;
+  const h=e.target.closest('.cat>.h'); if(h){const c=CATS[+h.parentNode.dataset.c];c.open=!h.parentNode.classList.contains('open');h.parentNode.classList.toggle('open',c.open)}
+});
+document.getElementById('q').oninput=e=>{q=e.target.value;render()};
+document.getElementById('b-act').onclick=()=>{onlyAct=!onlyAct;render()};
+render();
+</script>
+</body>
+</html>
