@@ -62,3 +62,6 @@ Qué falta, en orden:
 Cosas a vigilar (según las notas del portal): el **VPS Hostinger vence el 2026-10-02**, `oimas.online` respondía "Not Found" de Easypanel desde el 2026-09-21,
 y la red institucional del MINAM bloquea `oimas.online` por nombre de dominio (esto también afectaría a un subdominio del servicio).
 Además: revisar cuotas y condiciones de uso de Earth Engine para un visor público (proyecto registrado como no comercial).
+
+> **Nota Easypanel:** Easypanel asigna el puerto interno **3000** (variable `PORT`); el dominio del servicio debe apuntar al puerto 3000, no al 8090.
+> Los errores de Earth Engine se devuelven como HTTP 500 y se escriben en los registros (Cloudflare oculta los 502/504).

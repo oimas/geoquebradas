@@ -12,6 +12,7 @@ Las credenciales de Earth Engine viven SOLO aquí (nunca en el HTML).
 Ejecutar (después de configurar las variables de entorno, ver README.md):
     uvicorn goes_tiles:app --host 0.0.0.0 --port 8090
 """
+import logging
 import os
 import time
 from datetime import datetime, timedelta
@@ -96,8 +97,10 @@ def goes(nombre: str):
         resp = _construir(nombre)
     except HTTPException:
         raise
-    except Exception as e:   # error de Earth Engine (cuota, credenciales, colección vacía…)
-        raise HTTPException(502, f"Earth Engine: {e}")
+    except Exception as e:   # error de Earth Engine (cuota, permisos, credenciales, colección vacía…)
+        logging.exception("Fallo al construir la capa %s", nombre)   # queda en los registros del servidor
+        # 500 y no 502: Cloudflare reemplaza los 502/504 por su propia página y oculta el mensaje
+        raise HTTPException(500, f"Earth Engine: {e}")
     _cache[nombre] = (ahora + CACHE_SEGUNDOS, resp)
     return resp
 
