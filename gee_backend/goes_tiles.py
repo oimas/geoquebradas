@@ -51,6 +51,16 @@ VIS_PP = {"bands": ["CMI_C13"], "min": 1300, "max": 3000, "palette": PALETA_PP}
 VIS_VIS = {"bands": ["CMI_C02", "CMI_C03", "CMI_C01"], "min": 64, "max": 5454, "gamma": 1.8}
 UMBRAL_PP = 2800   # `seleccion_rango_z`: CMI_C13 <= 2800
 
+# Umbrales de "senamhi" (celdas de posible activacion), iguales a los del
+# script GEOMIDAGRI/SSATMI (clases1/classes/senamhi): dos clases sobre
+# CMI_C13 (1000,1950] y (1950,2150], vectorizadas a 5000 m y filtradas a
+# poligonos con 10 o mas pixeles, para no tomar ruido de 1-2 pixeles.
+UMBRAL_SENAMHI_INF = 1000
+UMBRAL_SENAMHI_MEDIO = 1950
+UMBRAL_SENAMHI_SUP = 2150
+ESCALA_SENAMHI = 5000
+CONTEO_MINIMO_SENAMHI = 10
+
 app = FastAPI(title="GeoQuebradas · GOES en vivo")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET"], allow_headers=["*"])
 _cache = {}   # nombre -> (expira_epoch, respuesta)
@@ -80,11 +90,41 @@ def _construir(nombre):
         capa = img.clip(AREA)
         vis = VIS_VIS
         leyenda = {"tipo": "rgb", "nota": "Composición RGB: canales 2, 3 y 1."}
+    elif nombre == "senamhi":
+        return _construir_senamhi(img, ts_ms)
     else:
-        raise HTTPException(404, "Capa desconocida (use 'pp' o 'vis').")
+        raise HTTPException(404, "Capa desconocida (use 'pp', 'vis' o 'senamhi').")
     url = capa.getMapId(vis)["tile_fetcher"].url_format
     hora = datetime.fromtimestamp(ts_ms / 1000, tz=ZoneInfo("America/Lima")) + timedelta(minutes=SUMA_MINUTOS)
     return {"url": url, "time_start_ms": ts_ms, "fecha_lima": hora.strftime("%d/%m/%Y %H:%M"), "leyenda": leyenda}
+
+
+def _construir_senamhi(img, ts_ms):
+    """Celdas de posible activacion (poligonos), igual que `senamhi` del
+    script GEOMIDAGRI/SSATMI: no es una tesela, es una FeatureCollection
+    con las celdas ya vectorizadas y filtradas por tamano minimo."""
+    c13 = img.select("CMI_C13")
+    clases1 = (ee.Image(1)
+               .where(c13.gt(UMBRAL_SENAMHI_INF).And(c13.lte(UMBRAL_SENAMHI_MEDIO)), 2)
+               .where(c13.gt(UMBRAL_SENAMHI_MEDIO).And(c13.lte(UMBRAL_SENAMHI_SUP)), 3))
+    clases = clases1.updateMask(clases1.eq(2).Or(clases1.eq(3)))
+    vectores = clases.clip(AREA).reduceToVectors(
+        reducer=ee.Reducer.countEvery(),
+        geometry=AREA,
+        scale=ESCALA_SENAMHI,
+        maxPixels=1e8,
+    )
+    activas = ee.FeatureCollection(vectores).filter(ee.Filter.gte("count", CONTEO_MINIMO_SENAMHI))
+    coleccion = activas.getInfo()   # FeatureCollection real (geometria + propiedades)
+    hora = datetime.fromtimestamp(ts_ms / 1000, tz=ZoneInfo("America/Lima")) + timedelta(minutes=SUMA_MINUTOS)
+    return {
+        "type": "FeatureCollection",
+        "features": coleccion.get("features", []),
+        "time_start_ms": ts_ms,
+        "fecha_lima": hora.strftime("%d/%m/%Y %H:%M"),
+        "umbral": {"inf": UMBRAL_SENAMHI_INF, "medio": UMBRAL_SENAMHI_MEDIO, "sup": UMBRAL_SENAMHI_SUP,
+                   "escala_m": ESCALA_SENAMHI, "conteo_minimo": CONTEO_MINIMO_SENAMHI},
+    }
 
 
 @app.get("/goes/{nombre}")
