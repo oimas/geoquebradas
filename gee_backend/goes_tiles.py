@@ -12,9 +12,13 @@ Las credenciales de Earth Engine viven SOLO aquí (nunca en el HTML).
 Ejecutar (después de configurar las variables de entorno, ver README.md):
     uvicorn goes_tiles:app --host 0.0.0.0 --port 8090
 """
+import json
 import logging
 import os
 import time
+import urllib.error
+import urllib.request
+from urllib.parse import quote
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -60,6 +64,29 @@ UMBRAL_SENAMHI_MEDIO = 1950
 UMBRAL_SENAMHI_SUP = 2150
 ESCALA_SENAMHI = 5000
 CONTEO_MINIMO_SENAMHI = 10
+
+# ───────────── terreno de la cuenca activa (piloto A08/D09) ─────────────
+# Mismos umbrales y paletas que piloto_dem_divisoria_gee.js (V1, proyecto
+# visor_geoquebradas/.claude/EVIDENCIAS/). MERIT Hydro es de libre uso para
+# este tipo de visualizacion; revisar terminos de uso antes de redistribuir
+# el dato crudo (no solo la tesela renderizada).
+MERIT = ee.Image("MERIT/Hydro/v1_0_1")
+UMBRAL_DRENAJE_SECUNDARIO_KM2 = 2
+UMBRAL_DRENAJE_PRINCIPAL_KM2 = 20
+VIS_ELEVACION = {"min": 0, "max": 5000,
+                  "palette": ["173b73", "55a6c8", "91bd70", "e3d38b", "8b6b4a", "f2f0e8"]}
+VIS_SOMBREADO = {"min": 0, "max": 255}
+VIS_DRENAJE = {"min": 1, "max": 2, "palette": ["00bfff", "081a75"]}  # 1=secundario, 2=principal
+
+# Consulta de ANA reusada solo para obtener la geometria de UNA cuenca por
+# su CODIGO (misma capa que ya usa el proxy /capas_ana del visor). Solo
+# lectura, sin credenciales.
+ANA_UNIDADES_HIDRO_QUERY = (
+    "https://geosnirh.ana.gob.pe/server/rest/services/ws_UnidadesHidro/"
+    "MapServer/1/query"
+)
+_cache_geom_cuenca = {}   # codigo -> (expira_epoch, geojson_geometry)
+CACHE_GEOM_CUENCA_SEGUNDOS = 6 * 3600   # igual que la cache de cuencas del visor
 
 app = FastAPI(title="GeoQuebradas · GOES en vivo")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET"], allow_headers=["*"])
@@ -127,6 +154,70 @@ def _construir_senamhi(img, ts_ms):
     }
 
 
+def _geometria_cuenca(codigo):
+    """Geometria (GeoJSON) de UNA cuenca de ANA por su CODIGO, en cache por
+    CACHE_GEOM_CUENCA_SEGUNDOS. Misma fuente publica que ya consulta el
+    proxy /capas_ana del visor; aqui solo se pide una entidad, no toda la
+    capa. Sin resultado -> None (no se inventa un recorte)."""
+    ahora = time.time()
+    hit = _cache_geom_cuenca.get(codigo)
+    if hit and hit[0] > ahora:
+        return hit[1]
+    where = "CODIGO=" + quote("'{}'".format(codigo))
+    url = "{}?where={}&outFields=CODIGO&returnGeometry=true&f=geojson".format(
+        ANA_UNIDADES_HIDRO_QUERY, where)
+    peticion = urllib.request.Request(url, headers={"User-Agent": "geoquebradas-terreno/1.0"})
+    with urllib.request.urlopen(peticion, timeout=20) as respuesta:
+        coleccion = json.loads(respuesta.read())
+    features = coleccion.get("features") or []
+    if not features:
+        return None
+    geometria = features[0]["geometry"]
+    _cache_geom_cuenca[codigo] = (ahora + CACHE_GEOM_CUENCA_SEGUNDOS, geometria)
+    return geometria
+
+
+def _construir_terreno(nombre, cuenca_codigo):
+    """Elevacion, sombreado o drenaje de MERIT Hydro, recortados a UNA
+    cuenca de ANA (piloto A08/D09: terreno de la cuenca activa). Sin
+    cuenca_codigo no se sirve nada -- no es una capa nacional de fondo."""
+    if not cuenca_codigo:
+        raise HTTPException(400, "falta cuenca_codigo (CODIGO de la cuenca ANA activa)")
+    geojson = _geometria_cuenca(cuenca_codigo)
+    if geojson is None:
+        raise HTTPException(404, "no se encontro la cuenca ANA con ese CODIGO")
+    geometria = ee.Geometry(geojson)
+
+    if nombre == "elevacion":
+        capa = MERIT.select("elv").clip(geometria)
+        vis = VIS_ELEVACION
+        leyenda = {"tipo": "rampa", "nota": "Elevación MERIT Hydro (m; resolución aprox. 90 m)."}
+    elif nombre == "sombreado":
+        sombreado = ee.Terrain.hillshade(MERIT.select("elv"))
+        capa = sombreado.clip(geometria)
+        vis = VIS_SOMBREADO
+        leyenda = {"tipo": "rampa", "nota": "Sombreado de relieve (hillshade) sobre MERIT Hydro."}
+    elif nombre == "drenaje":
+        upa = MERIT.select("upa")
+        clases = (ee.Image(0)
+                  .where(upa.gte(UMBRAL_DRENAJE_SECUNDARIO_KM2), 1)
+                  .where(upa.gte(UMBRAL_DRENAJE_PRINCIPAL_KM2), 2))
+        capa = clases.selfMask().clip(geometria)
+        vis = VIS_DRENAJE
+        leyenda = {"tipo": "clases",
+                    "clases": [{"valor": 1, "color": VIS_DRENAJE["palette"][0],
+                                "nota": f"Drenaje secundario (UPA {UMBRAL_DRENAJE_SECUNDARIO_KM2}-{UMBRAL_DRENAJE_PRINCIPAL_KM2} km²)"},
+                               {"valor": 2, "color": VIS_DRENAJE["palette"][1],
+                                "nota": f"Cauce principal (UPA ≥ {UMBRAL_DRENAJE_PRINCIPAL_KM2} km²)"}],
+                   "nota": "Red de drenaje MERIT Hydro por umbral de área aguas arriba (UPA), igual que el piloto V1."}
+    else:
+        raise HTTPException(404, "capa de terreno desconocida (use 'elevacion', 'sombreado' o 'drenaje')")
+
+    url = capa.getMapId(vis)["tile_fetcher"].url_format
+    return {"url": url, "cuenca_codigo": cuenca_codigo, "leyenda": leyenda,
+            "nota_general": "Terreno de referencia (MERIT Hydro), no es una divisoria de aguas validada."}
+
+
 @app.get("/goes/{nombre}")
 def goes(nombre: str):
     ahora = time.time()
@@ -142,6 +233,27 @@ def goes(nombre: str):
         # 500 y no 502: Cloudflare reemplaza los 502/504 por su propia página y oculta el mensaje
         raise HTTPException(500, f"Earth Engine: {e}")
     _cache[nombre] = (ahora + CACHE_SEGUNDOS, resp)
+    return resp
+
+
+@app.get("/terreno/{nombre}")
+def terreno(nombre: str, cuenca_codigo: str = ""):
+    # Cache propia (clave = nombre + cuenca): el terreno no cambia como GOES,
+    # pero igual se evita recalcular en cada clic mientras la cuenca activa
+    # no cambie.
+    clave = f"{nombre}:{cuenca_codigo}"
+    ahora = time.time()
+    hit = _cache.get(clave)
+    if hit and hit[0] > ahora:
+        return hit[1]
+    try:
+        resp = _construir_terreno(nombre, cuenca_codigo)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Fallo al construir terreno %s para cuenca %s", nombre, cuenca_codigo)
+        raise HTTPException(500, f"Earth Engine: {e}")
+    _cache[clave] = (ahora + CACHE_SEGUNDOS, resp)
     return resp
 
 
