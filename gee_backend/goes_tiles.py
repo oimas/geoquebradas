@@ -12,19 +12,18 @@ Las credenciales de Earth Engine viven SOLO aquí (nunca en el HTML).
 Ejecutar (después de configurar las variables de entorno, ver README.md):
     uvicorn goes_tiles:app --host 0.0.0.0 --port 8090
 """
+import hashlib
 import json
 import logging
 import os
 import time
-import urllib.error
-import urllib.request
-from urllib.parse import quote
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import ee
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # ───────────── configuración (variables de entorno) ─────────────
 EE_PROJECT = os.environ["EE_PROJECT"]                       # proyecto de Google Cloud registrado en Earth Engine
@@ -78,18 +77,8 @@ VIS_ELEVACION = {"min": 0, "max": 5000,
 VIS_SOMBREADO = {"min": 0, "max": 255}
 VIS_DRENAJE = {"min": 1, "max": 2, "palette": ["00bfff", "081a75"]}  # 1=secundario, 2=principal
 
-# Consulta de ANA reusada solo para obtener la geometria de UNA cuenca por
-# su CODIGO (misma capa que ya usa el proxy /capas_ana del visor). Solo
-# lectura, sin credenciales.
-ANA_UNIDADES_HIDRO_QUERY = (
-    "https://geosnirh.ana.gob.pe/server/rest/services/ws_UnidadesHidro/"
-    "MapServer/1/query"
-)
-_cache_geom_cuenca = {}   # codigo -> (expira_epoch, geojson_geometry)
-CACHE_GEOM_CUENCA_SEGUNDOS = 6 * 3600   # igual que la cache de cuencas del visor
-
 app = FastAPI(title="GeoQuebradas · GOES en vivo")
-app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET", "POST"], allow_headers=["*"])
 _cache = {}   # nombre -> (expira_epoch, respuesta)
 
 
@@ -154,38 +143,23 @@ def _construir_senamhi(img, ts_ms):
     }
 
 
-def _geometria_cuenca(codigo):
-    """Geometria (GeoJSON) de UNA cuenca de ANA por su CODIGO, en cache por
-    CACHE_GEOM_CUENCA_SEGUNDOS. Misma fuente publica que ya consulta el
-    proxy /capas_ana del visor; aqui solo se pide una entidad, no toda la
-    capa. Sin resultado -> None (no se inventa un recorte)."""
-    ahora = time.time()
-    hit = _cache_geom_cuenca.get(codigo)
-    if hit and hit[0] > ahora:
-        return hit[1]
-    where = "CODIGO=" + quote("'{}'".format(codigo))
-    url = "{}?where={}&outFields=CODIGO&returnGeometry=true&f=geojson".format(
-        ANA_UNIDADES_HIDRO_QUERY, where)
-    peticion = urllib.request.Request(url, headers={"User-Agent": "geoquebradas-terreno/1.0"})
-    with urllib.request.urlopen(peticion, timeout=20) as respuesta:
-        coleccion = json.loads(respuesta.read())
-    features = coleccion.get("features") or []
-    if not features:
-        return None
-    geometria = features[0]["geometry"]
-    _cache_geom_cuenca[codigo] = (ahora + CACHE_GEOM_CUENCA_SEGUNDOS, geometria)
-    return geometria
+class PeticionTerreno(BaseModel):
+    # Geometria GeoJSON (type+coordinates) de la cuenca ya activa, tal cual
+    # la tiene el visor (viene de ANA via nuestro propio proxy /capas_ana,
+    # nunca se vuelve a pedir aqui). cuenca_codigo es solo para la cache y
+    # los registros, no se usa para buscar nada.
+    geometria: dict
+    cuenca_codigo: str = ""
 
 
-def _construir_terreno(nombre, cuenca_codigo):
-    """Elevacion, sombreado o drenaje de MERIT Hydro, recortados a UNA
-    cuenca de ANA (piloto A08/D09: terreno de la cuenca activa). Sin
-    cuenca_codigo no se sirve nada -- no es una capa nacional de fondo."""
-    if not cuenca_codigo:
-        raise HTTPException(400, "falta cuenca_codigo (CODIGO de la cuenca ANA activa)")
-    geojson = _geometria_cuenca(cuenca_codigo)
-    if geojson is None:
-        raise HTTPException(404, "no se encontro la cuenca ANA con ese CODIGO")
+def _construir_terreno(nombre, geojson, cuenca_codigo):
+    """Elevacion, sombreado o drenaje de MERIT Hydro, recortados a la
+    geometria de UNA cuenca (piloto A08/D09: terreno de la cuenca activa).
+    La geometria la manda quien llama (nuestro proxy propio); este servicio
+    no vuelve a consultar ANA -- se probo que ese servidor no puede
+    alcanzar geosnirh.ana.gob.pe (timeout consistente, no intermitente)."""
+    if not geojson or "type" not in geojson or "coordinates" not in geojson:
+        raise HTTPException(400, "falta geometria valida (GeoJSON type+coordinates) de la cuenca activa")
     geometria = ee.Geometry(geojson)
 
     if nombre == "elevacion":
@@ -236,22 +210,27 @@ def goes(nombre: str):
     return resp
 
 
-@app.get("/terreno/{nombre}")
-def terreno(nombre: str, cuenca_codigo: str = ""):
-    # Cache propia (clave = nombre + cuenca): el terreno no cambia como GOES,
-    # pero igual se evita recalcular en cada clic mientras la cuenca activa
-    # no cambie.
-    clave = f"{nombre}:{cuenca_codigo}"
+@app.post("/terreno/{nombre}")
+def terreno(nombre: str, peticion: PeticionTerreno):
+    # POST, no GET: la geometria de la cuenca la manda quien llama (nuestro
+    # proxy propio), no se reconstruye aqui -- ver nota en _construir_terreno
+    # sobre por que este servicio ya no consulta ANA directamente.
+    # Cache propia (clave = nombre + cuenca o hash de la geometria): el
+    # terreno no cambia como GOES, pero igual se evita recalcular en cada
+    # clic mientras la cuenca activa no cambie.
+    clave_geom = peticion.cuenca_codigo or hashlib.sha256(
+        json.dumps(peticion.geometria, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    clave = f"{nombre}:{clave_geom}"
     ahora = time.time()
     hit = _cache.get(clave)
     if hit and hit[0] > ahora:
         return hit[1]
     try:
-        resp = _construir_terreno(nombre, cuenca_codigo)
+        resp = _construir_terreno(nombre, peticion.geometria, peticion.cuenca_codigo)
     except HTTPException:
         raise
     except Exception as e:
-        logging.exception("Fallo al construir terreno %s para cuenca %s", nombre, cuenca_codigo)
+        logging.exception("Fallo al construir terreno %s para cuenca %s", nombre, peticion.cuenca_codigo)
         raise HTTPException(500, f"Earth Engine: {e}")
     _cache[clave] = (ahora + CACHE_SEGUNDOS, resp)
     return resp
